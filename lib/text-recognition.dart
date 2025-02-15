@@ -5,36 +5,31 @@ import 'package:flutter/material.dart';
 import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
 import 'package:google_mlkit_image_labeling/google_mlkit_image_labeling.dart';
 import 'package:google_mlkit_object_detection/google_mlkit_object_detection.dart';
+import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 import 'package:image_picker/image_picker.dart';
 
-class ObjectDetectionPage extends StatefulWidget {
-  const ObjectDetectionPage({super.key, required this.title});
+class TextRecognitionPage extends StatefulWidget {
+  const TextRecognitionPage({super.key, required this.title});
   final String title;
 
   @override
-  State<ObjectDetectionPage> createState() => _ObjectDetectionPageState();
+  State<TextRecognitionPage> createState() => _TextRecognitionPageState();
 }
 
-class _ObjectDetectionPageState extends State<ObjectDetectionPage> {
+class _TextRecognitionPageState extends State<TextRecognitionPage> {
   File? _image;
   dynamic image;
   dynamic drawImage;
   late ImagePicker imagePicker;
-
   String results = "";
-  late ObjectDetector _objectDetector;
-  late List<DetectedObject> objects;
+  late TextRecognizer _textRecognizer;
+  late RecognizedText recognizedTexts;
 
   @override
   void initState() {
     // TODO: implement initState
     imagePicker = ImagePicker();
-    _objectDetector = ObjectDetector(
-        options: ObjectDetectorOptions(
-            mode: DetectionMode.single,
-            classifyObjects: true,
-            multipleObjects: true));
-
+    _textRecognizer = TextRecognizer(script: TextRecognitionScript.latin);
     super.initState();
   }
 
@@ -45,15 +40,31 @@ class _ObjectDetectionPageState extends State<ObjectDetectionPage> {
       setState(() {
         _image = File(selectedImage.path);
       });
-      doObjectDetection();
+      doTextRecognition();
     }
   }
 
-  doObjectDetection() async {
+  doTextRecognition() async {
     results = "";
     InputImage inputImage = InputImage.fromFile(_image!);
-    objects = await _objectDetector.processImage(inputImage);
-
+    recognizedTexts = await _textRecognizer.processImage(inputImage);
+    String text = recognizedTexts.text;
+    setState(() {
+      results = text;
+    });
+    for (TextBlock block in recognizedTexts.blocks) {
+      final Rect rect = block.boundingBox;
+      final List<Point<int>> cornerPoints = block.cornerPoints;
+      final String text = block.text;
+      final List<String> languages = block.recognizedLanguages;
+      for (TextLine line in block.lines) {
+        for (TextElement element in line.elements) {
+          results += element.text + " ";
+        }
+        results += "\n";
+      }
+      results += "\n";
+    }
     setState(() {
       results;
     });
@@ -101,7 +112,7 @@ class _ObjectDetectionPageState extends State<ObjectDetectionPage> {
                                   height: drawImage.height.toDouble(),
                                   child: CustomPaint(
                                     painter: FacePainter(
-                                        objectsList: objects,
+                                        recognizedTexts: recognizedTexts,
                                         imageFile: drawImage),
                                   ),
                                 ),
@@ -159,9 +170,9 @@ class _ObjectDetectionPageState extends State<ObjectDetectionPage> {
 }
 
 class FacePainter extends CustomPainter {
-  List<DetectedObject> objectsList;
+  RecognizedText recognizedTexts;
   dynamic imageFile;
-  FacePainter({required this.objectsList, required this.imageFile});
+  FacePainter({required this.recognizedTexts, required this.imageFile});
   @override
   void paint(Canvas canvas, Size size) {
     if (imageFile != null) {
@@ -172,25 +183,6 @@ class FacePainter extends CustomPainter {
       ..color = Colors.red
       ..style = PaintingStyle.stroke
       ..strokeWidth = 4;
-    print("Number of objects ${objectsList.length}");
-    for (DetectedObject object in objectsList) {
-      canvas.drawRect(object.boundingBox, paint);
-      print("Number of labels ${object.labels.length}");
-      for (Label label in object.labels) {
-        print("Object ${label.text} ${label.confidence.toStringAsFixed(2)} ");
-        TextSpan span = TextSpan(
-            text: label.text,
-            style: TextStyle(fontSize: 20, color: Colors.blue));
-        TextPainter textPainter = TextPainter(
-            text: span,
-            textAlign: TextAlign.left,
-            textDirection: TextDirection.ltr);
-        textPainter.layout();
-        textPainter.paint(
-            canvas, Offset(object.boundingBox.left, object.boundingBox.right));
-        break;
-      }
-    }
 
     Paint paint2 = Paint();
     paint2
