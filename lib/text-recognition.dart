@@ -159,7 +159,7 @@ class _TextRecognitionPageState extends State<TextRecognitionPage> {
                 Card(
                     child: Container(
                   width: double.infinity,
-                  child: Text(results),
+                  child: SelectableText(results),
                   margin: EdgeInsets.all(10),
                 ))
               ],
